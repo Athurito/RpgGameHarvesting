@@ -12,6 +12,7 @@
 #include "EnhancedInputComponent.h"
 #include "EnhancedInputSubsystems.h"
 #include "InputActionValue.h"
+#include "SkillAttributeSet.h"
 #include "Public/PlayerHarvestAttributeSet.h"
 
 DEFINE_LOG_CATEGORY(LogTemplateCharacter);
@@ -58,6 +59,8 @@ AHarvestGASCharacter::AHarvestGASCharacter()
 	AbilitySystem->SetReplicationMode(EGameplayEffectReplicationMode::Mixed);
 	
 	Attributes = CreateDefaultSubobject<UPlayerHarvestAttributeSet>(TEXT("Attributes"));
+	SkillAttributes = CreateDefaultSubobject<USkillAttributeSet>(TEXT("SkillAttributes"));
+
 
 	bReplicates = true;
 }
@@ -130,6 +133,14 @@ void AHarvestGASCharacter::InitAttributes()
 	{
 		Attributes->SetHarvestPower(1.0f);
 		Attributes->SetYieldBonus(0.0f);
+	}
+
+	if (SkillAttributes)
+	{
+		SkillAttributes->SetMiningLevel(1);
+		SkillAttributes->SetWoodcuttingLevel(1);
+		SkillAttributes->SetMiningXP(1);
+		SkillAttributes->SetWoodcuttingXP(1);
 	}
 }
 

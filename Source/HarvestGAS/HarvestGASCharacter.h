@@ -9,6 +9,7 @@
 #include "Logging/LogMacros.h"
 #include "HarvestGASCharacter.generated.h"
 
+class USkillAttributeSet;
 class USpringArmComponent;
 class UCameraComponent;
 class UInputAction;
@@ -70,6 +71,10 @@ public:
 
 	UPROPERTY()
 	UPlayerHarvestAttributeSet* Attributes;
+
+	UPROPERTY()
+	USkillAttributeSet* SkillAttributes;
+
 
 	UPROPERTY(EditDefaultsOnly, Category="Abilities")
 	TSubclassOf<UGameplayAbility> HarvestAbilityClass;
