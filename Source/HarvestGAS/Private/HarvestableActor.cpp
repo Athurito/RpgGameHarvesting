@@ -8,23 +8,34 @@
 
 AHarvestableActor::AHarvestableActor()
 {
+	bReplicates = true;
 	PrimaryActorTick.bCanEverTick = false;
 
 	Mesh = CreateDefaultSubobject<UStaticMeshComponent>(TEXT("Mesh"));
 	RootComponent = Mesh;
 
 	Harvestable = CreateDefaultSubobject<UHarvestableComponent>(TEXT("Harvestable"));
-	bReplicates = true;
 }
 
 void AHarvestableActor::BeginPlay()
 {
 	Super::BeginPlay();
-	Harvestable->OnDepleted.AddDynamic(this, &AHarvestableActor::OnDepleted);
+	Harvestable->OnHit.AddDynamic(this, &AHarvestableActor::HandleHit);
+	Harvestable->OnDepleted.AddDynamic(this, &AHarvestableActor::HandleDepleted);
+	Harvestable->OnRespawned.AddDynamic(this, &AHarvestableActor::HandleRespawned);
 }
 
-void AHarvestableActor::OnDepleted()
+void AHarvestableActor::HandleHit(float NewRemaining, AActor* InstigatorActor)
 {
-	// Optional zusätzliche Logik (FX, Sounds)
+	BP_OnHarvestHit(InstigatorActor);
 }
 
+void AHarvestableActor::HandleDepleted(AActor* InstigatorActor)
+{
+	BP_OnDepleted(InstigatorActor);
+}
+
+void AHarvestableActor::HandleRespawned()
+{
+	BP_OnRespawned();
+}

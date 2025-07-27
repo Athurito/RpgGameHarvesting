@@ -17,19 +17,15 @@ public class HarvestGAS : ModuleRules
 			"AIModule",
 			"StateTreeModule",
 			"GameplayStateTreeModule",
-			"UMG", "GameplayAbilities", "GameplayTags", "GameplayTasks"
+			"UMG", "GameplayAbilities", "GameplayTags", "GameplayTasks", "Niagara"
 		});
 
 		PrivateDependencyModuleNames.AddRange(new string[] { });
 
 		PublicIncludePaths.AddRange(new string[] {
 			"HarvestGAS",
-			"HarvestGAS/Variant_Platforming",
 			"HarvestGAS/Variant_Combat",
 			"HarvestGAS/Variant_Combat/AI",
-			"HarvestGAS/Variant_SideScrolling",
-			"HarvestGAS/Variant_SideScrolling/Gameplay",
-			"HarvestGAS/Variant_SideScrolling/AI"
 		});
 
 		// Uncomment if you are using Slate UI

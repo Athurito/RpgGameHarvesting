@@ -4,6 +4,7 @@
 
 #include "CoreMinimal.h"
 #include "AbilitySystemInterface.h"
+#include "GameplayTagContainer.h"
 #include "GameFramework/Character.h"
 #include "Logging/LogMacros.h"
 #include "HarvestGASCharacter.generated.h"
@@ -75,6 +76,9 @@ public:
 
 	UFUNCTION()
 	void Input_Harvest();
+
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Gameplay Tags")
+	FGameplayTagContainer DefaultGameplayTags;
 
 protected:
 

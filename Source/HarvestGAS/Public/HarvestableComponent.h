@@ -7,7 +7,11 @@
 #include "Components/ActorComponent.h"
 #include "HarvestableComponent.generated.h"
 
-DECLARE_DYNAMIC_MULTICAST_DELEGATE(FOnHarvestableDepleted);
+class UHarvestableConfig;
+
+DECLARE_DYNAMIC_MULTICAST_DELEGATE_TwoParams(FOnHit, float, NewRemaining, AActor*, InstigatorActor);
+DECLARE_DYNAMIC_MULTICAST_DELEGATE_OneParam(FOnDepleted, AActor*, InstigatorActor);
+DECLARE_DYNAMIC_MULTICAST_DELEGATE(FOnRespawned);
 
 
 UCLASS(ClassGroup=(Custom), meta=(BlueprintSpawnableComponent))
@@ -19,37 +23,45 @@ public:
 	UHarvestableComponent();
 
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, ReplicatedUsing=OnRep_Remaining)
-	float Remaining = 100.f;
+	float Remaining;
 
 	UPROPERTY(EditAnywhere, BlueprintReadOnly)
-	float MaxAmount = 100.f;
-
-	UPROPERTY(EditAnywhere, BlueprintReadOnly)
-	FGameplayTag ResourceType; // e.g. Resource.Wood
-
-	UFUNCTION(Server, Reliable)
-	void Server_ApplyHarvest(float Amount, AActor* InstigatorActor);
-
-	UPROPERTY(BlueprintAssignable)
-	FOnHarvestableDepleted OnDepleted;
-
-
-protected:
-	UFUNCTION()
-	void OnRep_Remaining();
-
-	virtual void BeginPlay() override;
-	virtual void GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutLifetimeProps) const override;
+	UHarvestableConfig* Config;
 
 	UPROPERTY(ReplicatedUsing=OnRep_Depleted)
 	bool bIsDepleted = false;
 
+	UFUNCTION(Server, Reliable)
+	void Server_ApplyHarvest(float Amount, AActor* InstigatorActor, const FGameplayTagContainer& SourceTags);
+
+	UPROPERTY(BlueprintAssignable) FOnHit OnHit;
+	UPROPERTY(BlueprintAssignable) FOnDepleted OnDepleted;
+	UPROPERTY(BlueprintAssignable) FOnRespawned OnRespawned;
+
+	UFUNCTION(BlueprintCallable)
+	bool CanBeHarvestedBy(AActor* InstigatorActor) const;
+
+	UFUNCTION(NetMulticast, Reliable)
+	void Multicast_PlayHitFX(AActor* InstigatorActor);
+
+	UFUNCTION(NetMulticast, Reliable)
+	void Multicast_PlayDepletedFX(AActor* InstigatorActor);
+
+	UFUNCTION(NetMulticast, Reliable)
+	void Multicast_PlayRespawnFX();
+
+protected:
+	virtual void BeginPlay() override;
+	virtual void GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutLifetimeProps) const override;
+
+	UFUNCTION()
+	void OnRep_Remaining();
+
 	UFUNCTION()
 	void OnRep_Depleted();
 
-	UFUNCTION(NetMulticast, Reliable)
-	void Multicast_ApplyDepletedState();
+	void HandleDepleted(AActor* InstigatorActor);
+	void Respawn();
 
-private:
-	// void HandleDepleted(AActor* InstigatorActor);
+	FTimerHandle RespawnTimer;
 };

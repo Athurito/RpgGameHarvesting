@@ -27,33 +27,21 @@ void UGA_Harvest::ActivateAbility(
 		return;
 	}
 
-	FVector Start = Character->GetActorLocation() + Character->GetControlRotation().Vector() * 50.f;
-	FVector End   = Start + Character->GetControlRotation().Vector() * TraceDistance;
+	FVector Start = Character->GetActorLocation() + Character->GetActorForwardVector() * 50.f;
+	FVector End = Start + Character->GetActorForwardVector() * TraceDistance;
 
 	FHitResult Hit;
-	FCollisionQueryParams Params(SCENE_QUERY_STAT(GA_HarvestTrace), false, Character);
+	FCollisionQueryParams Params;
+	Params.AddIgnoredActor(Character);
 
-	bool bHit = Character->GetWorld()->LineTraceSingleByChannel(Hit, Start, End, ECC_Visibility, Params);
-
-#if !(UE_BUILD_SHIPPING || UE_BUILD_TEST)
-	DrawDebugLine(Character->GetWorld(), Start, End, bHit ? FColor::Green : FColor::Red, false, 2.f, 0, 1.f);
-#endif
-
-	if (bHit && Hit.GetActor())
+	if (Character->GetWorld()->LineTraceSingleByChannel(Hit, Start, End, ECC_Visibility, Params))
 	{
-		if (UHarvestableComponent* Harvestable = Hit.GetActor()->FindComponentByClass<UHarvestableComponent>())
+		if (AActor* HitActor = Hit.GetActor())
 		{
-			float Power = 1.f;
-			if (const UAbilitySystemComponent* ASC = ActorInfo->AbilitySystemComponent.Get())
+			if (UHarvestableComponent* Harvestable = HitActor->FindComponentByClass<UHarvestableComponent>())
 			{
-				if (const UPlayerHarvestAttributeSet* Attr = ASC->GetSet<UPlayerHarvestAttributeSet>())
-				{
-					Power = Attr->GetHarvestPower();
-				}
+				Harvestable->Server_ApplyHarvest(BaseHarvestDamage, Character, FGameplayTagContainer());
 			}
-
-			const float Amount = BaseHarvestDamage * Power;
-			Harvestable->Server_ApplyHarvest(Amount, Character);
 		}
 	}
 

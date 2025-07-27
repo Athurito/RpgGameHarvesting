@@ -56,7 +56,7 @@ AHarvestGASCharacter::AHarvestGASCharacter()
 	AbilitySystem = CreateDefaultSubobject<UAbilitySystemComponent>(TEXT("AbilitySystem"));
 	AbilitySystem->SetIsReplicated(true);
 	AbilitySystem->SetReplicationMode(EGameplayEffectReplicationMode::Mixed);
-
+	
 	Attributes = CreateDefaultSubobject<UPlayerHarvestAttributeSet>(TEXT("Attributes"));
 
 	bReplicates = true;
@@ -115,6 +115,12 @@ void AHarvestGASCharacter::GiveStartupAbilities()
 	if (AbilitySystem && HarvestAbilityClass)
 	{
 		AbilitySystem->GiveAbility(FGameplayAbilitySpec(HarvestAbilityClass, 1, 0));
+
+
+		for (auto DefaultGamePlayTag : DefaultGameplayTags)
+		{
+			AbilitySystem->AddLooseGameplayTag(DefaultGamePlayTag);
+		}
 	}
 }
 
