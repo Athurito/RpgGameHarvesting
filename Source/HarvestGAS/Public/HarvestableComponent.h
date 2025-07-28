@@ -22,25 +22,37 @@ class HARVESTGAS_API UHarvestableComponent : public UActorComponent
 public:
 	UHarvestableComponent();
 
-	UPROPERTY(EditAnywhere, BlueprintReadOnly, ReplicatedUsing=OnRep_Remaining)
+	// --- Config ---
+	UPROPERTY(EditAnywhere, BlueprintReadOnly)
+	TObjectPtr<UHarvestableConfig> Config;
+
+	// --- State ---
+	UPROPERTY(ReplicatedUsing = OnRep_Remaining)
 	float Remaining;
 
-	UPROPERTY(EditAnywhere, BlueprintReadOnly)
-	UHarvestableConfig* Config;
-
-	UPROPERTY(ReplicatedUsing=OnRep_Depleted)
+	UPROPERTY(ReplicatedUsing = OnRep_Depleted)
 	bool bIsDepleted = false;
 
+	// --- Events for Blueprint/Designer ---
+	UPROPERTY(BlueprintAssignable)
+	FOnHit OnHit;
+
+	UPROPERTY(BlueprintAssignable)
+	FOnDepleted OnDepleted;
+
+	UPROPERTY(BlueprintAssignable)
+	FOnRespawned OnRespawned;
+
+	// --- Server API ---
 	UFUNCTION(Server, Reliable)
 	void Server_ApplyHarvest(float Amount, AActor* InstigatorActor, const FGameplayTagContainer& SourceTags);
 
-	UPROPERTY(BlueprintAssignable) FOnHit OnHit;
-	UPROPERTY(BlueprintAssignable) FOnDepleted OnDepleted;
-	UPROPERTY(BlueprintAssignable) FOnRespawned OnRespawned;
-
 	UFUNCTION(BlueprintCallable)
-	bool CanBeHarvestedBy(AActor* InstigatorActor) const;
+	bool CanBeHarvestedBy(AActor* InstigatorActor, const FGameplayTagContainer& SourceTags) const;
 
+	void Respawn();
+
+	// --- FX ---
 	UFUNCTION(NetMulticast, Reliable)
 	void Multicast_PlayHitFX(AActor* InstigatorActor);
 
@@ -50,18 +62,20 @@ public:
 	UFUNCTION(NetMulticast, Reliable)
 	void Multicast_PlayRespawnFX();
 
+	UFUNCTION(NetMulticast, Reliable)
+	void Multicast_SetVisibilityAndCollision(bool bVisible);
+
 protected:
 	virtual void BeginPlay() override;
 	virtual void GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutLifetimeProps) const override;
+
+	void HandleDepleted(AActor* InstigatorActor);
 
 	UFUNCTION()
 	void OnRep_Remaining();
 
 	UFUNCTION()
 	void OnRep_Depleted();
-
-	void HandleDepleted(AActor* InstigatorActor);
-	void Respawn();
 
 	FTimerHandle RespawnTimer;
 };

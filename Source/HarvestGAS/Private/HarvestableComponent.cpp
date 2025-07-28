@@ -6,14 +6,30 @@
 #include "AbilitySystemBlueprintLibrary.h"
 #include "AbilitySystemComponent.h"
 #include "HarvestableConfig.h"
+#include "HarvestRespawnManager.h"
 #include "NiagaraFunctionLibrary.h"
 #include "Kismet/GameplayStatics.h"
 #include "Net/UnrealNetwork.h"
 
-
 UHarvestableComponent::UHarvestableComponent()
 {
-	SetIsReplicatedByDefault(true);
+    SetIsReplicatedByDefault(true);
+    PrimaryComponentTick.bCanEverTick = false;
+}
+
+void UHarvestableComponent::Multicast_SetVisibilityAndCollision_Implementation(bool bVisible)
+{
+    if (AActor* Owner = GetOwner())
+    {
+        TArray<UPrimitiveComponent*> PrimitiveComps;
+        Owner->GetComponents<UPrimitiveComponent>(PrimitiveComps);
+
+        for (UPrimitiveComponent* Prim : PrimitiveComps)
+        {
+            Prim->SetCollisionEnabled(bVisible ? ECollisionEnabled::QueryAndPhysics : ECollisionEnabled::NoCollision);
+            Prim->SetVisibility(bVisible);
+        }
+    }
 }
 
 void UHarvestableComponent::BeginPlay()
@@ -22,17 +38,18 @@ void UHarvestableComponent::BeginPlay()
     Remaining = Config ? Config->MaxHealth : 100.f;
 }
 
-bool UHarvestableComponent::CanBeHarvestedBy(AActor* InstigatorActor) const
+bool UHarvestableComponent::CanBeHarvestedBy(AActor* InstigatorActor, const FGameplayTagContainer& SourceTags) const
 {
     if (!Config || !InstigatorActor) return false;
 
     UAbilitySystemComponent* InstigatorASC = UAbilitySystemBlueprintLibrary::GetAbilitySystemComponent(InstigatorActor);
     if (!InstigatorASC) return false;
 
-    const FGameplayTagContainer& RequiredTags = Config->RequiredToolTags;
-    if (!RequiredTags.IsEmpty() && !InstigatorASC->HasAllMatchingGameplayTags(RequiredTags))
+    const FGameplayTagContainer& Required = Config->RequiredToolTags;
+
+    if (!Required.IsEmpty() && !InstigatorASC->HasAllMatchingGameplayTags(Required))
     {
-        return false; // Spieler hat nicht die benötigten Tool-Tags (z.B. Tool.Axe)
+        return false;
     }
 
     return true;
@@ -42,14 +59,27 @@ void UHarvestableComponent::Server_ApplyHarvest_Implementation(float Amount, AAc
 {
     if (!Config || bIsDepleted) return;
 
+    if (!CanBeHarvestedBy(InstigatorActor, SourceTags))
+        return;
 
-    // Prüfen, ob der Spieler das richtige Tool/Tag besitzt
-    if (!CanBeHarvestedBy(InstigatorActor))
+    // --- Instant Pickup (Sticks etc.)
+    if (Config->HarvestType == EHarvestType::InstantPickup)
     {
-        return; // Abbrechen, Spieler kann diesen Node nicht ernten
+        bIsDepleted = true;
+        HandleDepleted(InstigatorActor);
+        if (Config->RespawnTime > 0.f)
+        {
+            AHarvestRespawnManager* Manager = AHarvestRespawnManager::Get(GetWorld());
+            if (Manager)
+            {
+                // Manager->RegisterForRespawn(this, Config->RespawnTime);
+                Manager->RegisterForRespawn(this, 1);
+            }
+        }
+        return;
     }
 
-    
+    // --- Damageable
     Remaining = FMath::Clamp(Remaining - Amount, 0.f, Config->MaxHealth);
     OnHit.Broadcast(Remaining, InstigatorActor);
     Multicast_PlayHitFX(InstigatorActor);
@@ -58,9 +88,14 @@ void UHarvestableComponent::Server_ApplyHarvest_Implementation(float Amount, AAc
     {
         bIsDepleted = true;
         HandleDepleted(InstigatorActor);
+
         if (Config->RespawnTime > 0.f)
         {
-            GetWorld()->GetTimerManager().SetTimer(RespawnTimer, this, &UHarvestableComponent::Respawn, Config->RespawnTime, false);
+            AHarvestRespawnManager* Manager = AHarvestRespawnManager::Get(GetWorld());
+            if (Manager)
+            {
+                Manager->RegisterForRespawn(this, Config->RespawnTime);
+            }
         }
     }
 }
@@ -69,17 +104,28 @@ void UHarvestableComponent::HandleDepleted(AActor* InstigatorActor)
 {
     OnDepleted.Broadcast(InstigatorActor);
     Multicast_PlayDepletedFX(InstigatorActor);
+    
+    Multicast_SetVisibilityAndCollision(false);
+
 }
 
 void UHarvestableComponent::Respawn()
 {
+    UE_LOG(LogTemp, Warning, TEXT("[RespawnManager] Respawning "));
+
+    UE_LOG(LogTemp, Warning, TEXT("[Respawn] Called on: %s | Role: %d"),
+    *GetOwner()->GetName(),
+    GetOwner()->GetLocalRole());
     bIsDepleted = false;
     Remaining = Config ? Config->MaxHealth : 100.f;
     OnRespawned.Broadcast();
     Multicast_PlayRespawnFX();
+    
+    Multicast_SetVisibilityAndCollision(true);
+
 }
 
-void UHarvestableComponent::Multicast_PlayHitFX_Implementation(AActor* Instigator)
+void UHarvestableComponent::Multicast_PlayHitFX_Implementation(AActor* InstigatorActor)
 {
     if (Config && Config->HitNiagara)
         UNiagaraFunctionLibrary::SpawnSystemAtLocation(this, Config->HitNiagara, GetOwner()->GetActorLocation());
@@ -88,7 +134,7 @@ void UHarvestableComponent::Multicast_PlayHitFX_Implementation(AActor* Instigato
         UGameplayStatics::PlaySoundAtLocation(this, Config->HitSound, GetOwner()->GetActorLocation());
 }
 
-void UHarvestableComponent::Multicast_PlayDepletedFX_Implementation(AActor* Instigator)
+void UHarvestableComponent::Multicast_PlayDepletedFX_Implementation(AActor* InstigatorActor)
 {
     if (Config && Config->DepletedNiagara)
         UNiagaraFunctionLibrary::SpawnSystemAtLocation(this, Config->DepletedNiagara, GetOwner()->GetActorLocation());
@@ -99,11 +145,15 @@ void UHarvestableComponent::Multicast_PlayDepletedFX_Implementation(AActor* Inst
 
 void UHarvestableComponent::Multicast_PlayRespawnFX_Implementation()
 {
-    // Optional respawn FX
+    if (Config && Config->RespawnNiagara)
+        UNiagaraFunctionLibrary::SpawnSystemAtLocation(this, Config->RespawnNiagara, GetOwner()->GetActorLocation());
+
+    if (Config && Config->RespawnSound)
+        UGameplayStatics::PlaySoundAtLocation(this, Config->RespawnSound, GetOwner()->GetActorLocation());
 }
 
-void UHarvestableComponent::OnRep_Remaining() { /* UI Update etc. */ }
-void UHarvestableComponent::OnRep_Depleted() { /* Mesh/Collision Updates */ }
+void UHarvestableComponent::OnRep_Remaining() { /* UI etc. */ }
+void UHarvestableComponent::OnRep_Depleted() { /* visibility client-side */ }
 
 void UHarvestableComponent::GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutLifetimeProps) const
 {

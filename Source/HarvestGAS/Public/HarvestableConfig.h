@@ -4,8 +4,16 @@
 
 #include "CoreMinimal.h"
 #include "GameplayTagContainer.h"
+#include "NiagaraSystem.h"
 #include "Engine/DataAsset.h"
 #include "HarvestableConfig.generated.h"
+
+UENUM(BlueprintType)
+enum class EHarvestType : uint8
+{
+	Damageable,   // z.B. Baum, Stein (mit HP)
+	InstantPickup // z.B. Stick, Berry, Pebble
+};
 
 UCLASS(BlueprintType)
 class HARVESTGAS_API UHarvestableConfig : public UDataAsset
@@ -13,30 +21,45 @@ class HARVESTGAS_API UHarvestableConfig : public UDataAsset
 	GENERATED_BODY()
 
 public:
-	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="Harvest")
-	float MaxHealth = 100.f;
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "General")
+	EHarvestType HarvestType = EHarvestType::Damageable;
 
-	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="Harvest")
-	float RespawnTime = 30.f;
-
-	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="Harvest")
+	// -- Shared --
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "General")
 	FGameplayTag ResourceType;
 
-	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="Harvest")
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "General")
+	float RespawnTime = 30.f;
+
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "General")
 	FGameplayTagContainer RequiredToolTags;
 
-	// FX / Sounds
-	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="FX")
-	class UNiagaraSystem* HitNiagara;
+	// -- Only for Damageable --
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Damageable", meta = (EditCondition = "HarvestType == EHarvestType::Damageable", EditConditionHides))
+	float MaxHealth = 100.f;
 
-	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="FX")
-	UNiagaraSystem* DepletedNiagara;
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Damageable", meta = (EditCondition = "HarvestType == EHarvestType::Damageable", EditConditionHides))
+	TObjectPtr<USoundBase> HitSound;
 
-	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="FX")
-	USoundBase* HitSound;
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Damageable", meta = (EditCondition = "HarvestType == EHarvestType::Damageable", EditConditionHides))
+	TObjectPtr<UNiagaraSystem> HitNiagara;
 
-	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="FX")
-	USoundBase* DepletedSound;
+	// -- Shared FX --
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "FX", meta = (EditCondition = "HarvestType == EHarvestType::Damageable", EditConditionHides))
+	TObjectPtr<USoundBase> DepletedSound;
+
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "FX", meta = (EditCondition = "HarvestType == EHarvestType::Damageable", EditConditionHides))
+	TObjectPtr<UNiagaraSystem> DepletedNiagara;
+
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "FX")
+	TObjectPtr<USoundBase> RespawnSound;
+
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "FX")
+	TObjectPtr<UNiagaraSystem> RespawnNiagara;
+
+	// -- Only for InstantPickup --
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "InstantPickup", meta = (EditCondition = "HarvestType == EHarvestType::InstantPickup", EditConditionHides))
+	TObjectPtr<USoundBase> PickupSound;
 
 	// Loot Info
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="Loot")

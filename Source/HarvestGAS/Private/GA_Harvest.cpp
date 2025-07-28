@@ -3,7 +3,6 @@
 
 #include "Public/GA_Harvest.h"
 
-#include "GE_AddXP.h"
 #include "HarvestableConfig.h"
 #include "SkillAttributeSet.h"
 #include "GameFramework/Character.h"
