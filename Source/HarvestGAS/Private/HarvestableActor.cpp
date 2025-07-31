@@ -10,6 +10,9 @@ AHarvestableActor::AHarvestableActor()
 {
 	bReplicates = true;
 	PrimaryActorTick.bCanEverTick = false;
+	NetDormancy     = DORM_Never;        // Actor bleibt immer "awake"
+	bAlwaysRelevant = true;              // nie aus Relevanz kicken
+	PrimaryActorTick.bCanEverTick = false;
 
 	Mesh = CreateDefaultSubobject<UStaticMeshComponent>(TEXT("Mesh"));
 	RootComponent = Mesh;

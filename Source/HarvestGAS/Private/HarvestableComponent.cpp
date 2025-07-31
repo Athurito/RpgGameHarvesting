@@ -6,7 +6,7 @@
 #include "AbilitySystemBlueprintLibrary.h"
 #include "AbilitySystemComponent.h"
 #include "HarvestableConfig.h"
-#include "HarvestRespawnManager.h"
+#include "HarvestRespawnSubsystem.h"
 #include "NiagaraFunctionLibrary.h"
 #include "Kismet/GameplayStatics.h"
 #include "Net/UnrealNetwork.h"
@@ -69,11 +69,12 @@ void UHarvestableComponent::Server_ApplyHarvest_Implementation(float Amount, AAc
         HandleDepleted(InstigatorActor);
         if (Config->RespawnTime > 0.f)
         {
-            AHarvestRespawnManager* Manager = AHarvestRespawnManager::Get(GetWorld());
-            if (Manager)
+            if (UWorld* World = GetWorld())
             {
-                // Manager->RegisterForRespawn(this, Config->RespawnTime);
-                Manager->RegisterForRespawn(this, 1);
+                if (auto* Sub = World->GetSubsystem<UHarvestRespawnSubsystem>())
+                {
+                    Sub->RegisterForRespawn(this, Config->RespawnTime);
+                }
             }
         }
         return;
@@ -91,10 +92,12 @@ void UHarvestableComponent::Server_ApplyHarvest_Implementation(float Amount, AAc
 
         if (Config->RespawnTime > 0.f)
         {
-            AHarvestRespawnManager* Manager = AHarvestRespawnManager::Get(GetWorld());
-            if (Manager)
+            if (UWorld* World = GetWorld())
             {
-                Manager->RegisterForRespawn(this, Config->RespawnTime);
+                if (auto* Sub = World->GetSubsystem<UHarvestRespawnSubsystem>())
+                {
+                    Sub->RegisterForRespawn(this, Config->RespawnTime);
+                }
             }
         }
     }
@@ -111,18 +114,35 @@ void UHarvestableComponent::HandleDepleted(AActor* InstigatorActor)
 
 void UHarvestableComponent::Respawn()
 {
-    UE_LOG(LogTemp, Warning, TEXT("[RespawnManager] Respawning "));
-
-    UE_LOG(LogTemp, Warning, TEXT("[Respawn] Called on: %s | Role: %d"),
-    *GetOwner()->GetName(),
-    GetOwner()->GetLocalRole());
+//     UE_LOG(LogTemp, Warning, TEXT("[RespawnManager] Respawning "));
+//
+//     UE_LOG(LogTemp, Warning, TEXT("[Respawn] Called on: %s | Role: %d"),
+//     *GetOwner()->GetName(),
+//     GetOwner()->GetLocalRole());
+//     bIsDepleted = false;
+//     Remaining = Config ? Config->MaxHealth : 100.f;
+//     OnRespawned.Broadcast();
+//     GetOwner()->SetNetDormancy(DORM_Awake);
+//
+//     
+//     Multicast_PlayRespawnFX();
+//     
+//     Multicast_SetVisibilityAndCollision(true);
+    // … deine bisherigen Logs und State‑Reset …
     bIsDepleted = false;
-    Remaining = Config ? Config->MaxHealth : 100.f;
+    Remaining   = Config ? Config->MaxHealth : 100.f;
+
     OnRespawned.Broadcast();
+
+    // wecke Dormant‑Actor kurz auf
+    GetOwner()->SetNetDormancy(DORM_Awake);
+
+    // spiele FX und setze sichtbar
     Multicast_PlayRespawnFX();
-    
     Multicast_SetVisibilityAndCollision(true);
 
+    // FORCIERT Sofort‑Replikation an alle Clients
+    GetOwner()->ForceNetUpdate();
 }
 
 void UHarvestableComponent::Multicast_PlayHitFX_Implementation(AActor* InstigatorActor)
@@ -153,7 +173,25 @@ void UHarvestableComponent::Multicast_PlayRespawnFX_Implementation()
 }
 
 void UHarvestableComponent::OnRep_Remaining() { /* UI etc. */ }
-void UHarvestableComponent::OnRep_Depleted() { /* visibility client-side */ }
+void UHarvestableComponent::OnRep_Depleted()
+{
+    if (AActor* Owner = GetOwner())
+    {
+        bool bVisible = !bIsDepleted;
+        TArray<UPrimitiveComponent*> PrimitiveComps;
+        Owner->GetComponents<UPrimitiveComponent>(PrimitiveComps);
+
+        for (UPrimitiveComponent* Prim : PrimitiveComps)
+        {
+            Prim->SetCollisionEnabled(
+                bVisible 
+                    ? ECollisionEnabled::QueryAndPhysics 
+                    : ECollisionEnabled::NoCollision
+            );
+            Prim->SetVisibility(bVisible);
+        }
+    }
+}
 
 void UHarvestableComponent::GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutLifetimeProps) const
 {
