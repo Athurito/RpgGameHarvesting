@@ -3,27 +3,39 @@
 
 #include "SkillAttributeSet.h"
 
+#include "HarvestConfigRegistry.h"
 #include "Net/UnrealNetwork.h"
 
 
-float USkillAttributeSet::XPForNextLevel(float CurrentLevel)
+float USkillAttributeSet::XPForNextLevel(float CurrentLevel, FName CurveName)
 {
-	return 100.f + (CurrentLevel * 50.f); // Beispiel: 100 XP + 50 pro Level
+	UGameInstance* GameInstance = GetWorld()->GetGameInstance();
+	UHarvestConfigRegistry* harvest = Cast<UHarvestConfigRegistry>(GameInstance);
+	return harvest->SkillExperience->FindCurve(CurveName, FString())->Eval(CurrentLevel);
 }
 
 void USkillAttributeSet::CheckLevelUp()
 {
-	if (GetMiningXP() >= XPForNextLevel(GetMiningLevel()))
-	{
-		SetMiningXP(GetMiningXP() - XPForNextLevel(GetMiningLevel()));
-		SetMiningLevel(GetMiningLevel() + 1.f);
-	}
 
-	if (GetWoodcuttingXP() >= XPForNextLevel(GetWoodcuttingLevel()))
+	auto TryLevelUp = [&](FGameplayAttributeData& XP, FGameplayAttributeData& Level, FName CurveName)
 	{
-		SetWoodcuttingXP(GetWoodcuttingXP() - XPForNextLevel(GetWoodcuttingLevel()));
-		SetWoodcuttingLevel(GetWoodcuttingLevel() + 1.f);
-	}
+		float Current = Level.GetCurrentValue();
+		float Needed  = XPForNextLevel(Current, CurveName);
+		// Solange genug XP für nächstes Level vorhanden ist, weiter leveln
+		while (XP.GetCurrentValue() >= Needed)
+		{
+			XP.SetCurrentValue(XP.GetCurrentValue() - Needed);
+			Current += 1.f;
+			Level.SetCurrentValue(Current);
+			Needed = XPForNextLevel(Current, CurveName);
+		}
+	};
+
+	TryLevelUp(MiningXP,        MiningLevel, "Mining");
+	TryLevelUp(WoodcuttingXP,   WoodcuttingLevel, "Woodcutting");
+	TryLevelUp(HarvestingXP,    HarvestingLevel, "Harvesting");
+	TryLevelUp(FishingXP,       FishingLevel, "Fishing");
+	TryLevelUp(SkinningXP,      SkinningLevel, "Skinning");
 }
 
 void USkillAttributeSet::GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutLifetimeProps) const
@@ -41,7 +53,19 @@ void USkillAttributeSet::PostGameplayEffectExecute(const FGameplayEffectModCallb
 	CheckLevelUp();
 }
 
-void USkillAttributeSet::OnRep_MiningLevel(const FGameplayAttributeData& OldValue) { GAMEPLAYATTRIBUTE_REPNOTIFY(USkillAttributeSet, MiningLevel, OldValue); }
-void USkillAttributeSet::OnRep_MiningXP(const FGameplayAttributeData& OldValue) { GAMEPLAYATTRIBUTE_REPNOTIFY(USkillAttributeSet, MiningXP, OldValue); }
-void USkillAttributeSet::OnRep_WoodcuttingLevel(const FGameplayAttributeData& OldValue) { GAMEPLAYATTRIBUTE_REPNOTIFY(USkillAttributeSet, WoodcuttingLevel, OldValue); }
-void USkillAttributeSet::OnRep_WoodcuttingXP(const FGameplayAttributeData& OldValue) { GAMEPLAYATTRIBUTE_REPNOTIFY(USkillAttributeSet, WoodcuttingXP, OldValue); }
+// Einfache Macro-Hilfe für RepNotifies
+#define REP_NOTIFY(Prop) \
+void USkillAttributeSet::OnRep_##Prop(const FGameplayAttributeData& OldValue) { GAMEPLAYATTRIBUTE_REPNOTIFY(USkillAttributeSet, Prop, OldValue); }
+
+REP_NOTIFY(MiningLevel)
+REP_NOTIFY(MiningXP)
+REP_NOTIFY(WoodcuttingLevel)
+REP_NOTIFY(WoodcuttingXP)
+REP_NOTIFY(HarvestingLevel)
+REP_NOTIFY(HarvestingXP)
+REP_NOTIFY(FishingLevel)
+REP_NOTIFY(FishingXP)
+REP_NOTIFY(SkinningLevel)
+REP_NOTIFY(SkinningXP)
+
+#undef REP_NOTIFY

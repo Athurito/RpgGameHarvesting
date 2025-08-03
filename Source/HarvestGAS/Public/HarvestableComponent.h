@@ -21,11 +21,7 @@ class HARVESTGAS_API UHarvestableComponent : public UActorComponent
 
 public:
 	UHarvestableComponent();
-
-	// --- Config ---
-	UPROPERTY(EditAnywhere, BlueprintReadOnly)
-	TObjectPtr<UHarvestableConfig> Config;
-
+	
 	// --- State ---
 	UPROPERTY(ReplicatedUsing = OnRep_Remaining)
 	float Remaining;
@@ -44,11 +40,13 @@ public:
 	FOnRespawned OnRespawned;
 
 	// --- Server API ---
+	// Neue überladene Methode, die ActionConfig direkt akzeptiert
 	UFUNCTION(Server, Reliable)
-	void Server_ApplyHarvest(float Amount, AActor* InstigatorActor, const FGameplayTagContainer& SourceTags);
+	void Server_ApplyHarvest(float Amount, AActor* InstigatorActor, UHarvestableConfig* ActionConfig);
+	
 
 	UFUNCTION(BlueprintCallable)
-	bool CanBeHarvestedBy(AActor* InstigatorActor, const FGameplayTagContainer& SourceTags) const;
+	bool CanBeHarvestedBy(AActor* InstigatorActor, UHarvestableConfig* ActionConfig) const;
 
 	void Respawn();
 
@@ -65,9 +63,14 @@ public:
 	UFUNCTION(NetMulticast, Reliable)
 	void Multicast_SetVisibilityAndCollision(bool bVisible);
 
+	UPROPERTY(EditAnywhere, BlueprintReadOnly)
+	FGameplayTag ResourceType;
+	
 protected:
 	virtual void BeginPlay() override;
 	virtual void GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutLifetimeProps) const override;
+
+	// -- Skill Configuration --
 
 	void HandleDepleted(AActor* InstigatorActor);
 
@@ -78,4 +81,8 @@ protected:
 	void OnRep_Depleted();
 
 	FTimerHandle RespawnTimer;
+
+private:
+	UPROPERTY()
+	UHarvestableConfig* Config;
 };

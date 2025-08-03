@@ -68,9 +68,7 @@ public:
 
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly)
 	UAbilitySystemComponent* AbilitySystem;
-
-	UPROPERTY()
-	UPlayerHarvestAttributeSet* Attributes;
+	
 
 	UPROPERTY()
 	USkillAttributeSet* SkillAttributes;

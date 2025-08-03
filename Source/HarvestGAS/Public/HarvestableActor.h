@@ -21,25 +21,4 @@ public:
 
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly)
 	UHarvestableComponent* Harvestable;
-
-	UFUNCTION(BlueprintImplementableEvent)
-	void BP_OnHarvestHit(AActor* InstigatorActor);
-
-	UFUNCTION(BlueprintImplementableEvent)
-	void BP_OnDepleted(AActor* InstigatorActor);
-
-	UFUNCTION(BlueprintImplementableEvent)
-	void BP_OnRespawned();
-
-protected:
-	virtual void BeginPlay() override;
-
-	UFUNCTION()
-	void HandleHit(float NewRemaining, AActor* InstigatorActor);
-
-	UFUNCTION()
-	void HandleDepleted(AActor* InstigatorActor);
-
-	UFUNCTION()
-	void HandleRespawned();
 };

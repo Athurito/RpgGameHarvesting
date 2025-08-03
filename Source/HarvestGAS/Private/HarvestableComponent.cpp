@@ -17,6 +17,11 @@ UHarvestableComponent::UHarvestableComponent()
     PrimaryComponentTick.bCanEverTick = false;
 }
 
+void UHarvestableComponent::BeginPlay()
+{
+    Super::BeginPlay();
+}
+
 void UHarvestableComponent::Multicast_SetVisibilityAndCollision_Implementation(bool bVisible)
 {
     if (AActor* Owner = GetOwner())
@@ -32,20 +37,15 @@ void UHarvestableComponent::Multicast_SetVisibilityAndCollision_Implementation(b
     }
 }
 
-void UHarvestableComponent::BeginPlay()
-{
-    Super::BeginPlay();
-    Remaining = Config ? Config->MaxHealth : 100.f;
-}
 
-bool UHarvestableComponent::CanBeHarvestedBy(AActor* InstigatorActor, const FGameplayTagContainer& SourceTags) const
+bool UHarvestableComponent::CanBeHarvestedBy(AActor* InstigatorActor, UHarvestableConfig* ActionConfig) const
 {
-    if (!Config || !InstigatorActor) return false;
+    if (!ActionConfig || !InstigatorActor) return false;
 
     UAbilitySystemComponent* InstigatorASC = UAbilitySystemBlueprintLibrary::GetAbilitySystemComponent(InstigatorActor);
     if (!InstigatorASC) return false;
 
-    const FGameplayTagContainer& Required = Config->RequiredToolTags;
+    const FGameplayTagContainer& Required = ActionConfig->RequiredToolTags;
 
     if (!Required.IsEmpty() && !InstigatorASC->HasAllMatchingGameplayTags(Required))
     {
@@ -55,25 +55,27 @@ bool UHarvestableComponent::CanBeHarvestedBy(AActor* InstigatorActor, const FGam
     return true;
 }
 
-void UHarvestableComponent::Server_ApplyHarvest_Implementation(float Amount, AActor* InstigatorActor, const FGameplayTagContainer& SourceTags)
+void UHarvestableComponent::Server_ApplyHarvest_Implementation(float Amount, AActor* InstigatorActor, UHarvestableConfig* ActionConfig)
 {
-    if (!Config || bIsDepleted) return;
-
-    if (!CanBeHarvestedBy(InstigatorActor, SourceTags))
+    if (!ActionConfig || bIsDepleted) return;
+    
+    Config = ActionConfig;
+    
+    if (!CanBeHarvestedBy(InstigatorActor, ActionConfig))
         return;
 
     // --- Instant Pickup (Sticks etc.)
-    if (Config->HarvestType == EHarvestType::InstantPickup)
+    if (ActionConfig->HarvestType == EHarvestType::InstantPickup)
     {
         bIsDepleted = true;
         HandleDepleted(InstigatorActor);
-        if (Config->RespawnTime > 0.f)
+        if (ActionConfig->RespawnTime > 0.f)
         {
             if (UWorld* World = GetWorld())
             {
                 if (auto* Sub = World->GetSubsystem<UHarvestRespawnSubsystem>())
                 {
-                    Sub->RegisterForRespawn(this, Config->RespawnTime);
+                    Sub->RegisterForRespawn(this, ActionConfig->RespawnTime);
                 }
             }
         }
@@ -81,7 +83,7 @@ void UHarvestableComponent::Server_ApplyHarvest_Implementation(float Amount, AAc
     }
 
     // --- Damageable
-    Remaining = FMath::Clamp(Remaining - Amount, 0.f, Config->MaxHealth);
+    Remaining = FMath::Clamp(Remaining - Amount, 0.f, ActionConfig->MaxHealth);
     OnHit.Broadcast(Remaining, InstigatorActor);
     Multicast_PlayHitFX(InstigatorActor);
 
@@ -90,13 +92,13 @@ void UHarvestableComponent::Server_ApplyHarvest_Implementation(float Amount, AAc
         bIsDepleted = true;
         HandleDepleted(InstigatorActor);
 
-        if (Config->RespawnTime > 0.f)
+        if (ActionConfig->RespawnTime > 0.f)
         {
             if (UWorld* World = GetWorld())
             {
                 if (auto* Sub = World->GetSubsystem<UHarvestRespawnSubsystem>())
                 {
-                    Sub->RegisterForRespawn(this, Config->RespawnTime);
+                    Sub->RegisterForRespawn(this, ActionConfig->RespawnTime);
                 }
             }
         }
@@ -109,33 +111,17 @@ void UHarvestableComponent::HandleDepleted(AActor* InstigatorActor)
     Multicast_PlayDepletedFX(InstigatorActor);
     
     Multicast_SetVisibilityAndCollision(false);
-
 }
 
 void UHarvestableComponent::Respawn()
 {
-//     UE_LOG(LogTemp, Warning, TEXT("[RespawnManager] Respawning "));
-//
-//     UE_LOG(LogTemp, Warning, TEXT("[Respawn] Called on: %s | Role: %d"),
-//     *GetOwner()->GetName(),
-//     GetOwner()->GetLocalRole());
-//     bIsDepleted = false;
-//     Remaining = Config ? Config->MaxHealth : 100.f;
-//     OnRespawned.Broadcast();
-//     GetOwner()->SetNetDormancy(DORM_Awake);
-//
-//     
-//     Multicast_PlayRespawnFX();
-//     
-//     Multicast_SetVisibilityAndCollision(true);
-    // … deine bisherigen Logs und State‑Reset …
     bIsDepleted = false;
     Remaining   = Config ? Config->MaxHealth : 100.f;
 
     OnRespawned.Broadcast();
 
-    // wecke Dormant‑Actor kurz auf
-    GetOwner()->SetNetDormancy(DORM_Awake);
+    // // wecke Dormant‑Actor kurz auf
+    // GetOwner()->SetNetDormancy(DORM_Awake);
 
     // spiele FX und setze sichtbar
     Multicast_PlayRespawnFX();

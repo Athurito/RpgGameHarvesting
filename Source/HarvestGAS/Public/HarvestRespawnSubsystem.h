@@ -6,10 +6,6 @@
 #include "Subsystems/WorldSubsystem.h"
 #include "HarvestRespawnSubsystem.generated.h"
 
-/**
- * 
- */
-
 
 class UHarvestableComponent;
 
