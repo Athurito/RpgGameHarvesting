@@ -15,19 +15,6 @@ class HARVESTGAS_API UGA_Harvest : public UGameplayAbility
 	GENERATED_BODY()
 
 public:
-	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="Harvest")
-	float BaseHarvestDamage = 25.f;
-
-	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="Tags")
-	FGameplayTagContainer SourceTagsToApply;
-
-	/** BP-GameplayEffect für Mining XP */
-	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="XP")
-	TSubclassOf<UGameplayEffect> MiningXP_GE;
-
-	/** BP-GameplayEffect für Woodcutting XP */
-	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="XP")
-	TSubclassOf<UGameplayEffect> WoodcuttingXP_GE;
 	// Trace-Länge
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="Harvest")
 	float TraceDistance = 300.f;

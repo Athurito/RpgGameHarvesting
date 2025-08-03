@@ -129,10 +129,26 @@ void AHarvestGASCharacter::InitAttributes()
 {
 	if (SkillAttributes)
 	{
+		// Level initialisieren (alle auf 1)
 		SkillAttributes->SetMiningLevel(1);
 		SkillAttributes->SetWoodcuttingLevel(1);
-		SkillAttributes->SetMiningXP(1);
-		SkillAttributes->SetWoodcuttingXP(1);
+		SkillAttributes->SetHarvestingLevel(1);
+		SkillAttributes->SetFishingLevel(1);
+		SkillAttributes->SetSkinningLevel(1);
+		
+		// XP initialisieren (alle auf 0)
+		SkillAttributes->SetMiningXP(0);
+		SkillAttributes->SetWoodcuttingXP(0);
+		SkillAttributes->SetHarvestingXP(0);
+		SkillAttributes->SetFishingXP(0);
+		SkillAttributes->SetSkinningXP(0);
+		
+		// TotalXP initialisieren (alle auf 0)
+		SkillAttributes->SetMiningTotalXP(0);
+		SkillAttributes->SetWoodcuttingTotalXP(0);
+		SkillAttributes->SetHarvestingTotalXP(0);
+		SkillAttributes->SetFishingTotalXP(0);
+		SkillAttributes->SetSkinningTotalXP(0);
 	}
 }
 

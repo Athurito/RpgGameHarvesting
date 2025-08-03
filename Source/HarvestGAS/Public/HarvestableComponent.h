@@ -3,7 +3,6 @@
 #pragma once
 
 #include "CoreMinimal.h"
-#include "GameplayTagContainer.h"
 #include "Components/ActorComponent.h"
 #include "HarvestableComponent.generated.h"
 
@@ -42,11 +41,11 @@ public:
 	// --- Server API ---
 	// Neue überladene Methode, die ActionConfig direkt akzeptiert
 	UFUNCTION(Server, Reliable)
-	void Server_ApplyHarvest(float Amount, AActor* InstigatorActor, UHarvestableConfig* ActionConfig);
+	void Server_ApplyHarvest(float Amount, AActor* InstigatorActor);
 	
 
 	UFUNCTION(BlueprintCallable)
-	bool CanBeHarvestedBy(AActor* InstigatorActor, UHarvestableConfig* ActionConfig) const;
+	bool CanBeHarvestedBy(AActor* InstigatorActor) const;
 
 	void Respawn();
 
@@ -63,8 +62,8 @@ public:
 	UFUNCTION(NetMulticast, Reliable)
 	void Multicast_SetVisibilityAndCollision(bool bVisible);
 
-	UPROPERTY(EditAnywhere, BlueprintReadOnly)
-	FGameplayTag ResourceType;
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly)
+	TObjectPtr<UHarvestableConfig> Config;
 	
 protected:
 	virtual void BeginPlay() override;
@@ -81,8 +80,4 @@ protected:
 	void OnRep_Depleted();
 
 	FTimerHandle RespawnTimer;
-
-private:
-	UPROPERTY()
-	UHarvestableConfig* Config;
 };

@@ -20,6 +20,18 @@ UHarvestableComponent::UHarvestableComponent()
 void UHarvestableComponent::BeginPlay()
 {
     Super::BeginPlay();
+    
+    // Initialisiere Remaining basierend auf Config
+    if (Config)
+    {
+        Remaining = Config->MaxHealth;
+    }
+    else
+    {
+        UE_LOG(LogTemp, Warning, TEXT("HarvestableComponent: Keine Config gesetzt für %s"), 
+               *GetOwner()->GetName());
+        Remaining = 100.f; // Fallback
+    }
 }
 
 void UHarvestableComponent::Multicast_SetVisibilityAndCollision_Implementation(bool bVisible)
@@ -38,14 +50,14 @@ void UHarvestableComponent::Multicast_SetVisibilityAndCollision_Implementation(b
 }
 
 
-bool UHarvestableComponent::CanBeHarvestedBy(AActor* InstigatorActor, UHarvestableConfig* ActionConfig) const
+bool UHarvestableComponent::CanBeHarvestedBy(AActor* InstigatorActor) const
 {
-    if (!ActionConfig || !InstigatorActor) return false;
+    if (!Config || !InstigatorActor) return false;
 
     UAbilitySystemComponent* InstigatorASC = UAbilitySystemBlueprintLibrary::GetAbilitySystemComponent(InstigatorActor);
     if (!InstigatorASC) return false;
 
-    const FGameplayTagContainer& Required = ActionConfig->RequiredToolTags;
+    const FGameplayTagContainer& Required = Config->RequiredToolTags;
 
     if (!Required.IsEmpty() && !InstigatorASC->HasAllMatchingGameplayTags(Required))
     {
@@ -55,27 +67,25 @@ bool UHarvestableComponent::CanBeHarvestedBy(AActor* InstigatorActor, UHarvestab
     return true;
 }
 
-void UHarvestableComponent::Server_ApplyHarvest_Implementation(float Amount, AActor* InstigatorActor, UHarvestableConfig* ActionConfig)
+void UHarvestableComponent::Server_ApplyHarvest_Implementation(float Amount, AActor* InstigatorActor)
 {
-    if (!ActionConfig || bIsDepleted) return;
+    if (bIsDepleted) return;
     
-    Config = ActionConfig;
-    
-    if (!CanBeHarvestedBy(InstigatorActor, ActionConfig))
+    if (!CanBeHarvestedBy(InstigatorActor))
         return;
 
     // --- Instant Pickup (Sticks etc.)
-    if (ActionConfig->HarvestType == EHarvestType::InstantPickup)
+    if (Config->HarvestType == EHarvestType::InstantPickup)
     {
         bIsDepleted = true;
         HandleDepleted(InstigatorActor);
-        if (ActionConfig->RespawnTime > 0.f)
+        if (Config->RespawnTime > 0.f)
         {
             if (UWorld* World = GetWorld())
             {
                 if (auto* Sub = World->GetSubsystem<UHarvestRespawnSubsystem>())
                 {
-                    Sub->RegisterForRespawn(this, ActionConfig->RespawnTime);
+                    Sub->RegisterForRespawn(this, Config->RespawnTime);
                 }
             }
         }
@@ -83,7 +93,7 @@ void UHarvestableComponent::Server_ApplyHarvest_Implementation(float Amount, AAc
     }
 
     // --- Damageable
-    Remaining = FMath::Clamp(Remaining - Amount, 0.f, ActionConfig->MaxHealth);
+    Remaining = FMath::Clamp(Remaining - Amount, 0.f, Config->MaxHealth);
     OnHit.Broadcast(Remaining, InstigatorActor);
     Multicast_PlayHitFX(InstigatorActor);
 
@@ -92,13 +102,13 @@ void UHarvestableComponent::Server_ApplyHarvest_Implementation(float Amount, AAc
         bIsDepleted = true;
         HandleDepleted(InstigatorActor);
 
-        if (ActionConfig->RespawnTime > 0.f)
+        if (Config->RespawnTime > 0.f)
         {
             if (UWorld* World = GetWorld())
             {
                 if (auto* Sub = World->GetSubsystem<UHarvestRespawnSubsystem>())
                 {
-                    Sub->RegisterForRespawn(this, ActionConfig->RespawnTime);
+                    Sub->RegisterForRespawn(this, Config->RespawnTime);
                 }
             }
         }
@@ -120,15 +130,9 @@ void UHarvestableComponent::Respawn()
 
     OnRespawned.Broadcast();
 
-    // // wecke Dormant‑Actor kurz auf
-    // GetOwner()->SetNetDormancy(DORM_Awake);
-
     // spiele FX und setze sichtbar
     Multicast_PlayRespawnFX();
     Multicast_SetVisibilityAndCollision(true);
-
-    // FORCIERT Sofort‑Replikation an alle Clients
-    GetOwner()->ForceNetUpdate();
 }
 
 void UHarvestableComponent::Multicast_PlayHitFX_Implementation(AActor* InstigatorActor)

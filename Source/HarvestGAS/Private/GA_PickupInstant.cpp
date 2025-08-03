@@ -6,6 +6,8 @@
 #include "AbilitySystemComponent.h"
 #include "HarvestableComponent.h"
 #include "HarvestableConfig.h"
+#include "HarvestConfigRegistry.h"
+#include "SkillAttributeSet.h"
 #include "GameFramework/Character.h"
 
 void UGA_PickupInstant::ActivateAbility(const FGameplayAbilitySpecHandle Handle,
@@ -19,28 +21,52 @@ void UGA_PickupInstant::ActivateAbility(const FGameplayAbilitySpecHandle Handle,
 	}
 
 	ACharacter* Character = Cast<ACharacter>(ActorInfo->AvatarActor.Get());
-	if (!Character) return;
+	if (!Character) { EndAbility(Handle, ActorInfo, ActivationInfo, true, false); return; }
 
-	FVector Start = Character->GetActorLocation();
+	// Perform line trace to find harvestable
+	FVector Start = Character->GetActorLocation() + Character->GetActorForwardVector() * 50.f;
 	FVector End = Start + Character->GetActorForwardVector() * TraceDistance;
 
 	FHitResult Hit;
-	if (Character->GetWorld()->LineTraceSingleByChannel(Hit, Start, End, ECC_Visibility))
+	UWorld* World = Character->GetWorld();
+	if (!World || !World->LineTraceSingleByChannel(Hit, Start, End, ECC_Visibility))
 	{
-		if (UHarvestableComponent* Harvestable = Hit.GetActor()->FindComponentByClass<UHarvestableComponent>())
-		{
-			if (Harvestable->Config && Harvestable->Config->HarvestType == EHarvestType::InstantPickup)
-			{
-				Harvestable->Server_ApplyHarvest(0.f, Character, SourceTagsToApply); // 0 Schaden → triggert sofort
-				if (XP_GE)
-				{
-					ActorInfo->AbilitySystemComponent->ApplyGameplayEffectToSelf(
-						XP_GE->GetDefaultObject<UGameplayEffect>(), 1.f,
-						ActorInfo->AbilitySystemComponent->MakeEffectContext());
-				}
-			}
-		}
+		EndAbility(Handle, ActorInfo, ActivationInfo, true, false);
+		return;
 	}
 
-	EndAbility(Handle, ActorInfo, ActivationInfo, true, false);
+	if (AActor* HitActor = Hit.GetActor())
+    {
+        if (UHarvestableComponent* Harvestable = HitActor->FindComponentByClass<UHarvestableComponent>())
+        {
+            // Calculate final damage based on skill
+           
+            if (const USkillAttributeSet* Skills = ActorInfo->AbilitySystemComponent->GetSet<USkillAttributeSet>())
+            {
+                // Dynamically select attribute via tag mapping in config
+                const FGameplayTag& SkillTag = Harvestable->Config->SkillAttributeTag;
+                float SkillLevel = 0.f;
+                if (SkillTag.MatchesTagExact(FGameplayTag::RequestGameplayTag(TEXT("Skill.Mining"))))
+                {
+                    SkillLevel = Skills->GetMiningLevel();
+                }
+                else if (SkillTag.MatchesTagExact(FGameplayTag::RequestGameplayTag(TEXT("Skill.Woodcutting"))))
+                {
+                    SkillLevel = Skills->GetWoodcuttingLevel();
+                }
+                // Additional skill types can be handled similarly
+                
+                // Apply XP GameplayEffect if set
+            	if ( Harvestable->Config->ExperienceGameplayEffect)
+            	{
+            		ActorInfo->AbilitySystemComponent->ApplyGameplayEffectToSelf(
+						 Harvestable->Config->ExperienceGameplayEffect->GetDefaultObject<UGameplayEffect>(), 1.f,
+						ActorInfo->AbilitySystemComponent->MakeEffectContext());
+            	}
+            }
+
+            // Execute harvest
+            Harvestable->Server_ApplyHarvest(0, Character);
+        }
+    }
 }
