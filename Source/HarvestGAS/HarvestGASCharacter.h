@@ -9,6 +9,7 @@
 #include "Logging/LogMacros.h"
 #include "HarvestGASCharacter.generated.h"
 
+class UEquipmentComponent;
 class USkillAttributeSet;
 class USpringArmComponent;
 class UCameraComponent;
@@ -68,7 +69,9 @@ public:
 
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly)
 	UAbilitySystemComponent* AbilitySystem;
-	
+
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly)
+	UEquipmentComponent* EquipmentSystem;
 
 	UPROPERTY()
 	USkillAttributeSet* SkillAttributes;

@@ -11,6 +11,7 @@
 #include "GameFramework/Controller.h"
 #include "EnhancedInputComponent.h"
 #include "EnhancedInputSubsystems.h"
+#include "EquipmentComponent.h"
 #include "InputActionValue.h"
 #include "SkillAttributeSet.h"
 
@@ -58,7 +59,9 @@ AHarvestGASCharacter::AHarvestGASCharacter()
 	AbilitySystem->SetReplicationMode(EGameplayEffectReplicationMode::Mixed);
 	
 	SkillAttributes = CreateDefaultSubobject<USkillAttributeSet>(TEXT("SkillAttributes"));
-
+	
+	EquipmentSystem = CreateDefaultSubobject<UEquipmentComponent>(TEXT("EquipmentSystem"));
+	EquipmentSystem->SetIsReplicated(true);
 
 	bReplicates = true;
 }
